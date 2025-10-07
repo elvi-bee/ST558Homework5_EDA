@@ -487,26 +487,3 @@ g <- ggplot(student_combF, aes(x = G3_mat, y = G3_por, color = address))
 
 The scatterplots show the relationship between Math and Portuguese final grades, faceted by internet access (yes/no) and school (GP/MS). In all panels, there is a clear positive relationship between grades, and students who perform well in one subject tend to perform well in the other. Students with internet access tend to cluster at slightly higher grade levels, especially at GP where the sample is larger. At MS, the relationship is less clear due to fewer students, but the same upward trend exists. Urban and rural students (color-coded) follow similar patterns across all groups, with urban students somewhat more concentrated in the higher grade ranges.
 
-*After each summary and graph discuss what is important about it*
-
-```{r}
-     
-view(student_por)
-view(student_mat)
-
-#mother and father education (Medu, Fedu) should be catgorical instead of integer
-#traveltime, studytime are categorical instead of integer
-
-student_por
-# use as.character or as.integer to reassign faulty column types
-student_por <- student_por |>
-  mutate(Medu = as.character(Medu),
-         Fedu = as.character(Fedu))# change Medu from integer to categorical
-
-#___________________________
-#explore columns and types of data
-psych::describe(student_por)
-colSums(is.na(student_por))
-#___________________________
-
-```
