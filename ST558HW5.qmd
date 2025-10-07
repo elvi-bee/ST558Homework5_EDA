@@ -1,0 +1,512 @@
+---
+title: "ST558_HW5"
+format: html
+editor: visual
+---
+
+## Task 1: Read in data and modify
+
+### Read in and combine the data using downloaded UCI code:
+
+```{r}
+d1=read.table("data/student-mat.csv",sep=";",header=TRUE)
+d2=read.table("data/student-por.csv",sep=";",header=TRUE)
+
+d3=merge(d1,d2,by=c("school","sex","age","address","famsize","Pstatus","Medu","Fedu","Mjob","Fjob","reason","nursery","internet"))
+print(nrow(d3)) # 382 students
+#view(d3)
+```
+
+### Read in and combine the data using functions from the tidyverse.
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(psych)
+
+student_por <- read.csv("data/student-por.csv",sep=";",header=TRUE)
+student_mat <- read.csv("data/student-mat.csv",sep=";",header=TRUE)
+```
+
+### Inner_join() on the variables used in downloaded UCI code.
+
+Note any issues.
+
+```{r}
+jointest <- inner_join(student_por, 
+            student_mat, 
+            by=c("school","sex","age","address","famsize","Pstatus",
+                 "Medu","Fedu","Mjob","Fjob","reason","nursery","internet"))
+
+view(jointest)
+```
+
+Issues: The following error was observed during the inner join: Warning in inner_join(student_por, student_mat, by = c("school", "sex", : Detected an unexpected many-to-many relationship between `x` and `y`. ℹ Row 79 of `x` matches multiple rows in `y`. ℹ Row 79 of `y` matches multiple rows in `x`. ℹ If a many-to-many relationship is expected, set `relationship = "many-to-many"` to silence this warning.
+
+### Inner_join() on all variables other than G1, G2, G3, paid, and absences.
+
+```{r}
+
+student_comb <- inner_join(student_por, student_mat, 
+            by=c("school","sex","age","address","famsize",
+                 "Pstatus","Medu","Fedu","Mjob","Fjob",
+                 "reason","guardian","traveltime","studytime","failures",
+                 "schoolsup","famsup","activities","nursery","higher",
+                 "internet","romantic","famrel","freetime","goout",
+                 "Dalc","Walc","health"),
+            # add suffix to clarify joined columns with similar headers
+            suffix = c("_por", "_mat"))
+
+```
+
+### Use mutate() to convert four categorical variables from Math, Portuguese and Combined data to factors using mutate().
+
+```{r}
+
+my_df_list <- list(student_comb, student_mat, student_por)
+
+for (i in seq_along(my_df_list)) {
+  my_df_list[[i]] <- my_df_list[[i]] |>
+    #student_comb <- student_comb |>
+    mutate(
+    # go out with friends
+    gooutF = factor(
+      goout,
+      levels = c(1,2,3,4,5),
+      labels = c("1 - very low", 
+               "2 - low", 
+               "3 - average", 
+               "4 - high", 
+               "5 - very high")
+    ),
+    # current health status: 1/very bad to 5/very good
+    healthF = factor(
+      health,
+      levels = c(1,2,3,4,5),
+      labels = c("1 - very bad", 
+               "2 - bad", 
+               "3 - average", 
+               "4 - good", 
+               "5 - very good")
+    ),
+    
+    # quality of family relationships: 1/very bad to 5/very good
+    famrelF = factor(
+      famrel,
+      levels = c(1,2,3,4,5),
+      labels = c("1 - very bad", 
+               "2 - bad", 
+               "3 - average", 
+               "4 - good", 
+               "5 - very good")
+    ),
+    
+    # workday alcohol consumption: 1/very low to 5/very high
+    DalcF = factor(
+      Dalc,
+      levels = c(1,2,3,4,5),
+      labels = c("1 - very low", 
+               "2 - low", 
+               "3 - average", 
+               "4 - high", 
+               "5 - very high")
+  )
+    )
+}
+student_combF <- my_df_list[[1]]
+student_matF <- my_df_list[[2]]
+student_porF <- my_df_list[[3]]
+
+```
+
+## Task 2
+
+### Initial Data Exploration
+
+```{r}
+# basic exploration to look at data and see if everyhting makes sense
+#str(student_combF)
+glimpse(student_combF)
+#view(student_combF)
+#class(student_combF)
+#head(student_combF)
+
+# explore missing values
+sum(is.na(student_combF))
+
+# set up a function to check NA values by column
+sum_na <- function(column){
+  sum(is.na(column))
+}
+sum_na(student_combF)
+#for student_por, across all columns, run my function, sum na
+na_counts <- student_combF |>
+  summarize(across(everything(), sum_na))
+na_counts
+
+```
+
+Notes on initial data exploration:
+
+-   Some variables like Medu, Fedu, traveltime, studytime, Walc are stored as integers but they are factors/ordinal categories. These variables would have to be converted to factors if they were to be used in analyses.
+
+-   Headers that were automatically renamed during the join process, e.g. G1.x and G1.y, could be renamed for ease of use.
+
+-   The combined data contain no NA values.
+
+### Categorical variables
+
+#### Create a one-way contingency table, a two-way contingency table, and a three-way contingency table for some of the factor variables you created previously.
+
+-   Use table() to accomplish this.
+-   Interpret a number from each resulting table.
+
+```{r}
+# one-way table
+table(student_combF$healthF)
+
+# two-way table
+table(student_combF$healthF, student_combF$famrelF)
+
+# three-way table
+table(student_combF$healthF, student_combF$famrelF, student_combF$gooutF)
+
+
+```
+
+Observations:
+
+**One-way table**: Health Status A total of 117 students reported their health status as *very good*, making this the most common response. The next highest category was average, with 70 students reporting this option.
+
+**Two-way table:** Health Status and Family Relationship A total of 63 students reported their health as *very good* AND their family relationships as *good*. (Rows represent health while columns represent family relationship.)
+
+**Three-way table**: Health Status,Family Relationship, and Going Out with Friends The first value in the first table that prints out is 0. This means that among students that report going out as very low, 0 reported their health status as very bad and their family relations as very bad. The last value from the last table is 7. Among students that reported going out with friends as very high, 7 reported both their health status and family relations as very good.
+
+#### Create a conditional two-way table using table(). That is, condition on one variable’s setting and create a two-way table. Do this using two different methods:
+
+– Once, by subsetting the data (say with filter()) and then creating the two-way table
+
+```{r}
+# subsetting the data and then creating the two-way table
+table(student_combF$healthF[student_combF$sex == "F"],
+  student_combF$famrelF[student_combF$sex == "F"])
+```
+
+Observation: Among females, the most common combination was very good health status and good family relations, with 30 students reporting this. In general, it appears that most female students report good family relations, and within that group, many also report good or very good health. 
+
+– Once, by creating a three-way table and subsetting it
+
+```{r}
+# Three-way table and subsetting it for Rural
+three_way_urban <- table(student_combF$healthF, student_combF$famrelF, student_combF$address )
+three_way_urban[, , "R"]
+
+```
+
+Observation: Among students with a rural address, the most common combination was very good health status and good family relations, with 15 students reporting this. In general, it appears that most rural students report good family relations, and within that group, many also report good health.
+
+• Create a two-way contingency table using group_by() and summarize() from dplyr. Then use pivot_wider() to make the result look more like the output from table().
+
+```{r}
+wide <- student_combF |>
+  group_by(healthF, famrelF) |>
+  summarize(count = n()) |>
+  pivot_wider(names_from = healthF, values_from = count)
+wide
+```
+
+Observation: Similar to previous tables, the most common combination is very good health status and good family relations, with 63 students reporting this.
+
+• Create a stacked bar graph and a side-by-side bar graph. Give relevant x and y labels, and a title for the plots.
+
+```{r}
+# simple bar graph
+g <- student_combF |> ggplot(aes(x = healthF))
+g + geom_bar() +
+    labs(title = "Health Status of Students",
+        x = "Health Status",
+        y = "Number of Students")
+
+```
+
+Observation: The bar graph shows that the most common health status category reported by students is 'very good'.
+
+```{r}
+# stacked bar graph
+g <- ggplot(data = student_combF, aes(x = healthF, fill = famrelF))
+g + geom_bar() +
+    labs(title = "Health Status of Students by Quality of Family Relationships",
+         x = "Health Status",
+         y = "Number of Students",
+         fill = "Quality of Family Relationships")
+```
+
+The graph illustrates the same relationship we saw in previous contingency tables, that most students reported very good for their health status and good for quality of family relationships.
+
+```{r}
+# side-by-side bar graph
+ggplot(data = student_combF, aes(x = healthF, fill = gooutF)) + 
+  geom_bar(position = "dodge") + 
+  labs(title = "Health Status by Social Engagement",
+       x = "Health Status",
+       y = "Number of Students")+ 
+  scale_fill_discrete("Going Out with Friends")
+
+```
+
+Observation: There does not appear to be a strong association between going out with friends and health status. While a small group of students who reported going out with friends very frequently also reported very good health, the majority of students in the very good health category reported lower levels of going out with friends.
+
+### Numeric variables (and across groups)
+
+The numeric variables are age, absences, and the three test grades variables (G1, G2, and G3) from each data set (Math and Portuguese).
+
+## Find measures of center and spread for three of these variables (including at least one G3 variable)
+
+```{r}
+descpor <- describe_grades <- psych::describe(student_combF[, c("G1_por", "G2_por", "G3_por")])
+view(descpor)
+
+by_por_grade <- student_combF |>
+  #group_by(sex) |>
+  summarise(
+    across(
+      c(G1_por, G2_por, G3_por),
+      list(
+        mean = ~mean(.x, na.rm=TRUE),
+        median = ~median(.x, na.rm=TRUE),
+        sd = ~sd(.x, na.rm=TRUE),
+        iqr = ~IQR(.x, na.rm=TRUE),
+        min = ~min(.x, na.rm=TRUE),
+        max = ~max(.x, na.rm=TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    )
+  )
+by_por_grade
+
+view(by_por_grade)
+
+#view(grades)
+```
+The measures for center and spread for the three Portuguese grades, G1, G2, and G3 were very similar. The means for the three grades were all between 12.39-12.88 while medians were all 12.0. Standard deviations were 2.42, 2.56, and 2.89. For G1 and G3 grades ranged from a minimum of 0 to a maximum of 19, while grades for G2 ranged from a mimimum of 5 to a maximum of 19.
+
+– Repeat while subsetting the data in a meaningful way.  
+
+```{r}
+
+by_sex_f <- student_combF |>
+  filter(sex == "F") |>
+  summarise(
+    across(
+      c(G1_por, G2_por, G3_por),
+      list(
+        mean = ~mean(.x, na.rm=TRUE),
+        median = ~median(.x, na.rm=TRUE),
+        sd = ~sd(.x, na.rm=TRUE),
+        iqr = ~IQR(.x, na.rm=TRUE),
+        min = ~min(.x, na.rm=TRUE),
+        max = ~max(.x, na.rm=TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    )
+  )
+view(by_sex_f)
+```
+Observation: When we subset to Portuguese grades for females, the mean for the three grades was 12.74 (G1), 12.9 (G2), and 13.3 (G3) indicating mean grades among females were slightly higher than mean grades for the whole student body. Median grade for females was 13 for each exam, 1 point higher than the median for the whole student body. 
+
+## Find measures of center and spread across a single grouping variable for three of these variables (including a G3 variable as one of them)
+
+```{r}
+
+by_address <- student_combF |>
+  group_by(address) |>
+  summarise(
+    across(
+      c(G1_por, G2_por, G3_por),
+      list(
+        mean = ~mean(.x, na.rm=TRUE),
+        median = ~median(.x, na.rm=TRUE),
+        sd = ~sd(.x, na.rm=TRUE),
+        iqr = ~IQR(.x, na.rm=TRUE),
+        min = ~min(.x, na.rm=TRUE),
+        max = ~max(.x, na.rm=TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    )
+  )
+view(by_address)
+```
+Observation: Mean grades were slightly higher for students with an Urban address (12.64, 12.82, 13.2) than for students with a Rural address(11.48, 11.64, 11.61). Similarly, medians for students with an Urban address was 13, while the median for students with a rural address ranged from 11-12.
+
+
+## Find measures of center and spread across two grouping variables for three of these variables (including a G3 variable as one of them)
+
+```{r}
+by_address_sex <- student_combF |>
+  group_by(address, sex) |>
+  summarise(
+    across(
+      c(G1_por, G2_por, G3_por),
+      list(
+        mean   = ~mean(.x, na.rm=TRUE),
+        median = ~median(.x, na.rm=TRUE),
+        sd     = ~sd(.x, na.rm=TRUE),
+        iqr    = ~IQR(.x, na.rm=TRUE),
+        min = ~min(.x, na.rm=TRUE),
+        max = ~max(.x, na.rm=TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    ),
+    .groups = "drop"
+  )
+
+view(by_address_sex)
+
+```
+Observation: Female students typically have higher means than male students within each address group. 
+Between the groups, both male and female students from the urban group have higher mean scores than males and females from the rural group. The lowest performing group are male students with rural addresses. 
+
+## Create a correlation matrix between all of the numeric variables
+
+```{r}
+#app_data |>
+#  group_by(Diagnosis, Sex) |>
+#  summarize(correlation = cor(BMI, Age, use = "pairwise.complete.obs"))
+
+
+# select only numeric columns
+num_data <- student_combF %>%
+  select(where(is.numeric))
+
+cor_matrix <- cor(num_data, use = "pairwise.complete.obs")
+#cor_matrix
+
+round(cor_matrix, 2)
+round
+view(cor_matrix)
+```
+When considering final grades in the correlation matrix, it appears that the final portuguese grade (G3) had the strongest positive correlation with the second Portuguese grade (0.89) followed by the first Portuguese grade (0.83). The final math grade (G3) had the strongest positive correlation with the second Math exam (0.91) followed by the first Math exam (0.82). 
+
+## Create a histogram, kernel density plot, and boxplot for two of the numeric variables across one of the categorical variables (that is, create graphs that can compare the distributions across the groups on the same plot (no faceting here)). Add appropriate labels and titles.
+
+```{r}
+# Histogram
+ggplot(student_combF, aes(x = G3_por, fill = address)) +
+  geom_histogram(alpha = 0.5, position = "identity", bins = 15) +
+  labs(title = "Distribution of Portuguese Final Grades (G3) by Address (Rural vs Urban)",
+       x = "Final Portuguese Grade", 
+       y = "Count",
+       fill = "Address")
+ 
+# Kernel Density
+g <- ggplot(data = student_combF, aes(x = G3_por))
+g + geom_density(alpha = 0.5, aes(fill = address)) +
+    labs(title = "Distribution of Portuguese Final Grades (G3) by Address (Rural vs Urban)",
+         x = "Final Portuguese Grade",
+         y = "Count",
+         fill = "Address")
+
+# Boxplot
+g <- ggplot(student_combF, aes(x = address, y = G3_por, fill = address))
+g + geom_boxplot() + 
+  geom_jitter(width = 0.2, alpha = 0.3) +
+  labs(title = "Boxplot of Portuguese Final Grades (G3) by Address (Rural vs Urban)",
+       x = "Final Portuguese Grade",
+       y = "Count",
+       fill = "Address")
+```
+The histogram, kernel density plot, and box plot all show that the final Portuguese grade is higher among students with an urban address than students with a rural address.
+
+## Create two scatterplots relating a G3 variable to other numeric variables (put G3 on the y-axis). You should jitter the points if they sit on top of each other. Color the points by a categorical variable in each. Add appropriate labels and titles.
+
+```{r}
+# scatterplot 1
+g <- ggplot(student_combF, aes(x = G3_mat, y = G3_por, color = address))
+  g + geom_jitter(width = 0.15, height = 0.15, alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Portuguese vs Math Final Grades by Address",
+    x = "Math Final Grade",
+    y = "Portuguese Final Grade",
+    color = "Address"
+  )
+```
+Observation: The scatterplot above shows a positive relationship between Portuguese and Math final grades indicating that students who perform well in one exam typically perform well in the other. This relationship is the same for both students with urban and rural addresses with urban students having somewhat higher grades than rural students. 
+
+
+```{r}
+# scatterplot 2
+g <- ggplot(student_combF, aes(x = absences_por, y = G3_por, color = sex))
+  g + geom_jitter(alpha = 0.6) +
+  geom_point() + geom_smooth(method = lm) +
+  labs(
+    title = "Portuguese Final Grade vs Absences by Sex",
+    x = "Absences in Portuguese (absences_por)",
+    y = "Portuguese Final Grade (G3_por)",
+    color = "Sex"
+  )
+
+```
+Observation: There is a negative association between Final Portuguese grades and Absences in Portuguese, meaning as absences increase grades somewhat decrease. This trend is consistent among both malel and female students. The trendline also shows that males, in general, have lower grades. 
+
+
+## Repeat the scatter plot step but use faceting to obtain graphs at each setting of another categorical variable.
+
+```{r}
+
+g <- ggplot(student_combF, aes(x = G3_mat, y = G3_por, color = address))
+  g + geom_jitter(width = 0.15, height = 0.15, alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Relationship between Portuguese and Math Final Grades by Address and School",
+    x = "Math Final Grade (G3_mat)",
+    y = "Portuguese Final Grade (G3_por)",
+    color = "Address") +
+    scale_fill_discrete() +
+    facet_wrap(~school)
+
+
+```
+
+The scatterplots show a positive relationship between Math and Portuguese final grades. Students who perform well in one subject tend to perform well in the other. This pattern is similar in both schools and among urban and rural students. Overall, the results suggest a consistent link between Math and Portuguese final grades, with some variation by school and address.
+
+## Repeat the scatter plot step but use faceting to obtain graphs at each combination of two categorical variables.
+
+```{r}
+g <- ggplot(student_combF, aes(x = G3_mat, y = G3_por, color = address))
+  g + geom_jitter(width = 0.15, height = 0.15, alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Portuguese vs Math Final Grades by Internet Access and School",
+    x = "Math Final Grade (G3_mat)",
+    y = "Portuguese Final Grade (G3_por)",
+    color = "Address"
+  ) +
+  facet_grid(internet ~ school)
+```
+
+The scatterplots show the relationship between Math and Portuguese final grades, faceted by internet access (yes/no) and school (GP/MS). In all panels, there is a clear positive relationship between grades, and students who perform well in one subject tend to perform well in the other. Students with internet access tend to cluster at slightly higher grade levels, especially at GP where the sample is larger. At MS, the relationship is less clear due to fewer students, but the same upward trend exists. Urban and rural students (color-coded) follow similar patterns across all groups, with urban students somewhat more concentrated in the higher grade ranges.
+
+*After each summary and graph discuss what is important about it*
+
+```{r}
+     
+view(student_por)
+view(student_mat)
+
+#mother and father education (Medu, Fedu) should be catgorical instead of integer
+#traveltime, studytime are categorical instead of integer
+
+student_por
+# use as.character or as.integer to reassign faulty column types
+student_por <- student_por |>
+  mutate(Medu = as.character(Medu),
+         Fedu = as.character(Fedu))# change Medu from integer to categorical
+
+#___________________________
+#explore columns and types of data
+psych::describe(student_por)
+colSums(is.na(student_por))
+#___________________________
+
+```
